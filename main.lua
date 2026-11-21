@@ -248,6 +248,12 @@ end
 
 -- ===================== FARM =====================
 local function DoAction()
+    -- Do not run the farming action unless the Character attribute is Ninja.
+    if Config.RequireCharacter and Player:GetAttribute("Character") ~= Config.RequireCharacter then
+        warn("[Character] ยังไม่ใช่ " .. Config.RequireCharacter .. " ข้ามรอบนี้")
+        return
+    end
+
     if not IsAlive() then
         return
     end
