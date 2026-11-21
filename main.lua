@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
 
 local Player = Players.LocalPlayer
 
@@ -94,6 +95,108 @@ if Player.Character then
 end
 
 -- ===================== CHARACTER CHANGE =====================
+local UseRemoteFallback = true -- ถ้ากดผ่าน GUI ไม่สำเร็จ ให้ลองยิง Remote แทน
+local GuiWaitTimeout = 3       -- รอหา GUI สูงสุดกี่วินาที
+
+-- รอจนเจอ path (ตารางชื่อ) ภายใต้ Root
+local function WaitPath(Root, Path, Timeout)
+    local Deadline = os.clock() + Timeout
+    repeat
+        local Obj = Root
+        for _, Name in ipairs(Path) do
+            Obj = Obj and Obj:FindFirstChild(Name)
+        end
+        if Obj then
+            return Obj
+        end
+        task.wait(0.1)
+    until os.clock() >= Deadline
+    return nil
+end
+
+-- กด GUI: UseMouse = false -> เรียก connection ก่อน, ถ้าไม่มีค่อยจำลองเมาส์
+--                 UseMouse = true  -> จำลองเมาส์เลย
+local function ClickGui(Obj, UseMouse)
+    local Target = Obj
+    if not Obj:IsA("GuiButton") then
+        Target = Obj:FindFirstChildWhichIsA("GuiButton", true) or Obj
+    end
+
+    if not UseMouse and getconnections and Target:IsA("GuiButton") then
+        -- ยิงแค่สัญญาณเดียว กันกดซ้ำจนเมนูเปิดแล้วปิด
+        for _, SignalName in ipairs({ "Activated", "MouseButton1Click" }) do
+            local Fired = 0
+            pcall(function()
+                for _, Conn in ipairs(getconnections(Target[SignalName])) do
+                    Conn:Fire()
+                    Fired += 1
+                end
+            end)
+            if Fired > 0 then
+                return true
+            end
+        end
+    end
+
+    -- จำลองเมาส์
+    local Pos = Obj.AbsolutePosition
+    local Size = Obj.AbsoluteSize
+    local X = Pos.X + Size.X / 2
+    local Y = Pos.Y + Size.Y / 2
+
+    local Gui = Obj:FindFirstAncestorOfClass("ScreenGui")
+    if Gui and not Gui.IgnoreGuiInset then
+        Y += GuiService:GetGuiInset().Y
+    end
+
+    VirtualInputManager:SendMouseMoveEvent(X, Y, game)
+    task.wait(0.05)
+    VirtualInputManager:SendMouseButtonEvent(X, Y, 0, true, game, 0)
+    task.wait(0.05)
+    VirtualInputManager:SendMouseButtonEvent(X, Y, 0, false, game, 0)
+    return true
+end
+
+-- เปลี่ยนตัวละครผ่านเมนูด้านบน: Characters -> Ninja
+local function ChangeViaGui(Want, PreferMouse)
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+
+    local CharactersBtn = WaitPath(
+        PlayerGui,
+        { "TopbarStandard", "Holders", "Left", "Characters" },
+        GuiWaitTimeout
+    )
+    if not CharactersBtn then
+        warn("[Character] ไม่เจอปุ่ม Characters")
+        return false
+    end
+
+    local WantBtn
+    local Modes = PreferMouse and { true, false } or { false, true }
+
+    for _, UseMouse in ipairs(Modes) do
+        ClickGui(CharactersBtn, UseMouse)
+        WantBtn = WaitPath(
+            PlayerGui,
+            { "TopbarStandardClipped", "ClippedContainer", "Dropdown", "DropdownScroller", Want, "IconButton" },
+            2
+        )
+        if WantBtn then
+            break
+        end
+    end
+
+    if not WantBtn then
+        warn("[Character] ไม่เจอปุ่ม " .. Want .. " ในเมนู")
+        return false
+    end
+
+    task.wait(0.2)
+    ClickGui(WantBtn, PreferMouse)
+    return true
+end
+
+-- ยิง Remote (ตัวสำรอง)
 local function FireChangeCharacter(Want)
     local args = {
         {
@@ -115,8 +218,6 @@ local function FireChangeCharacter(Want)
             end
 
             if Remote and Remote:IsA("RemoteEvent") then
-                ForceDie()
-                task.wait(0.1)
                 pcall(Remote.FireServer, Remote, unpack(args))
                 Sent = true
             end
@@ -128,11 +229,26 @@ local function FireChangeCharacter(Want)
         local Remote = Character and Character:FindFirstChild("Communicate")
 
         if Remote then
-            ForceDie()
-            task.wait(0.1)
             pcall(Remote.FireServer, Remote, unpack(args))
         end
     end
+end
+
+-- บังคับตายแล้วรอตัวละครใหม่เกิด
+local function KillAndWaitRespawn(Timeout)
+    local Old = Player.Character
+    ForceDie()
+
+    local Start = os.clock()
+    while os.clock() - Start < Timeout do
+        local Char = Player.Character
+        if Char and Char ~= Old and Char:FindFirstChildOfClass("Humanoid") then
+            task.wait(RespawnDelay + 1)
+            return true
+        end
+        task.wait(0.2)
+    end
+    return false
 end
 
 local function EnsureCharacter(Want)
@@ -156,16 +272,24 @@ local function EnsureCharacter(Want)
             Try .. ")"
         )
 
-        FireChangeCharacter(Want)
+        -- 1) บังคับตาย
+        KillAndWaitRespawn(10)
 
+        -- 2) กดเมนู Characters -> Want (สลับใช้เมาส์ทุกครั้งที่เป็นเลขคู่)
+        local Ok = ChangeViaGui(Want, Try % 2 == 0)
+
+        -- 3) กดไม่สำเร็จ ลองยิง Remote แทน
+        if not Ok and UseRemoteFallback then
+            FireChangeCharacter(Want)
+        end
+
+        -- 4) รอให้ Attribute เปลี่ยน
         local Start = os.clock()
-
         while os.clock() - Start < 5 do
             if Player:GetAttribute("Character") == Want then
                 task.wait(RespawnDelay + 1)
                 return true
             end
-
             task.wait(0.2)
         end
     end
@@ -254,8 +378,10 @@ end
 local function DoAction()
     -- Do not run the farming action unless the Character attribute is Ninja.
     if Config.RequireCharacter and Player:GetAttribute("Character") ~= Config.RequireCharacter then
-        warn("[Character] ยังไม่ใช่ " .. Config.RequireCharacter .. " ข้ามรอบนี้")
-        return
+        warn("[Character] ยังไม่ใช่ " .. Config.RequireCharacter .. " กำลังแก้ก่อนฟาร์ม")
+        if not EnsureCharacter(Config.RequireCharacter) then
+            return
+        end
     end
 
     if not IsAlive() then
