@@ -115,6 +115,8 @@ local function FireChangeCharacter(Want)
             end
 
             if Remote and Remote:IsA("RemoteEvent") then
+                ForceDie()
+                task.wait(0.1)
                 pcall(Remote.FireServer, Remote, unpack(args))
                 Sent = true
             end
@@ -126,6 +128,8 @@ local function FireChangeCharacter(Want)
         local Remote = Character and Character:FindFirstChild("Communicate")
 
         if Remote then
+            ForceDie()
+            task.wait(0.1)
             pcall(Remote.FireServer, Remote, unpack(args))
         end
     end
