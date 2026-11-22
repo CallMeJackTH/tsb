@@ -402,7 +402,7 @@ if Config.ShowCounter then
     })
 
     local Card = New("Frame", {
-        Size = UDim2.new(0, 440, 0, 270),
+        Size = UDim2.new(0, 440, 0, 290),
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 0),
         BackgroundColor3 = Color3.fromRGB(8, 8, 10),
@@ -478,8 +478,8 @@ if Config.ShowCounter then
 
     -- Main panel
     local Panel = New("Frame", {
-        Size = UDim2.new(1, -40, 0, 120),
-        Position = UDim2.new(0, 20, 0, 86),
+        Size = UDim2.new(1, -40, 0, 140),
+        Position = UDim2.new(0, 20, 0, 84),
         BackgroundColor3 = Color3.fromRGB(14, 14, 16),
         BorderSizePixel = 0,
     }, Card)
@@ -487,24 +487,24 @@ if Config.ShowCounter then
     Stroke(Panel, Color3.fromRGB(50, 50, 55), 1.5)
 
     New("ImageLabel", { -- masks icon
-        Size = UDim2.new(0, 84, 0, 84),
-        Position = UDim2.new(0, 12, 0, 10),
+        Size = UDim2.new(0, 116, 0, 116),
+        Position = UDim2.new(0, 8, 0, 12),
         BackgroundTransparency = 1,
         Image = EMOTE_ICON,
         ScaleType = Enum.ScaleType.Fit,
     }, Panel)
 
     CountLabel = Text(Panel, {
-        Size = UDim2.new(1, -110, 0, 70),
-        Position = UDim2.new(0, 100, 0, 6),
+        Size = UDim2.new(1, -136, 0, 76),
+        Position = UDim2.new(0, 128, 0, 10),
         Text = "0",
         TextSize = 56,
         TextXAlignment = Enum.TextXAlignment.Center,
     })
 
     Text(Panel, {
-        Size = UDim2.new(1, -110, 0, 24),
-        Position = UDim2.new(0, 100, 0, 76),
+        Size = UDim2.new(1, -136, 0, 24),
+        Position = UDim2.new(0, 128, 0, 90),
         Text = "EMOTES",
         TextSize = 20,
         TextColor3 = Purple,
@@ -513,7 +513,7 @@ if Config.ShowCounter then
 
     local Line = New("Frame", {
         Size = UDim2.new(0, 190, 0, 2),
-        Position = UDim2.new(0, 147, 0, 104),
+        Position = UDim2.new(0, 166, 0, 118),
         BackgroundColor3 = Purple,
         BorderSizePixel = 0,
     }, Panel)
@@ -528,7 +528,7 @@ if Config.ShowCounter then
     -- Footer: user (bottom right)
     local User = New("Frame", {
         AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -20, 0, 226),
+        Position = UDim2.new(1, -20, 0, 242),
         Size = UDim2.new(0, 0, 0, 28),
         AutomaticSize = Enum.AutomaticSize.X,
         BackgroundTransparency = 1,
@@ -571,6 +571,69 @@ if Config.ShowCounter then
         Font = Enum.Font.GothamMedium,
         LayoutOrder = 2,
     })
+
+    -- Alt status (footer left)
+    local AltBox = New("Frame", {
+        Position = UDim2.new(0, 20, 0, 242),
+        Size = UDim2.new(0, 0, 0, 28),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundTransparency = 1,
+    }, Card)
+    New("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        Padding = UDim.new(0, 8),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+    }, AltBox)
+
+    local AltDot = New("Frame", {
+        Size = UDim2.new(0, 10, 0, 10),
+        BorderSizePixel = 0,
+        LayoutOrder = 1,
+    }, AltBox)
+    Round(AltDot, UDim.new(1, 0))
+
+    local AltText = Text(AltBox, {
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        TextSize = 15,
+        Font = Enum.Font.GothamMedium,
+        LayoutOrder = 2,
+    })
+
+    local Green = Color3.fromRGB(80, 220, 120)
+    local Red = Color3.fromRGB(230, 80, 80)
+
+    local function RefreshAlts()
+        local Online = 0
+        for _, Name in ipairs(AltNames) do
+            if Players:FindFirstChild(Name) then
+                Online += 1
+            end
+        end
+
+        if Online > 0 then
+            AltDot.BackgroundColor3 = Green
+            AltText.TextColor3 = Green
+            AltText.Text = string.format("Alt online : %d/%d", Online, #AltNames)
+        else
+            AltDot.BackgroundColor3 = Red
+            AltText.TextColor3 = Red
+            AltText.Text = "Alert : No alt is online"
+        end
+    end
+
+    RefreshAlts()
+    Players.PlayerAdded:Connect(RefreshAlts)
+    Players.PlayerRemoving:Connect(function()
+        task.defer(RefreshAlts)
+    end)
+    task.spawn(function()
+        while true do
+            task.wait(2)
+            RefreshAlts()
+        end
+    end)
 
     -- free drag (เมาส์ + ทัช)
     do
