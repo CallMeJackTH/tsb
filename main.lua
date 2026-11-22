@@ -31,7 +31,7 @@ local RequiredCharacter = "Ninja"
 local MaxChangeTries = 10
 
 local PRYVEX_ICON = "rbxassetid://127972121421541"
-local EMOTE_ICON = "rbxassetid://80047644158722"
+local EMOTE_ICON = "rbxassetid://74563956423630"
 
 -- ===================== ROLES =====================
 local Roles = {
