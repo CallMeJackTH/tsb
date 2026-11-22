@@ -29,6 +29,9 @@ local BlindInterval = 1
 local RequiredCharacter = "Ninja"
 local MaxChangeTries = 10
 
+local PRYVEX_ICON = "rbxassetid://127972121421541"
+local EMOTE_ICON = "rbxassetid://80047644158722"
+
 -- ===================== ROLES =====================
 local Roles = {
     [FarmerName] = {
@@ -334,44 +337,249 @@ if NoRender then
     end
 end
 
--- ===================== COUNTER UI =====================
+-- ===================== STATUS UI (Farmer only) =====================
 local EmoteCount = 0
-local CounterLabel
+local CountLabel
+local TimeLabel
+local StartTime = os.clock()
+
+local Purple = Color3.fromRGB(150, 80, 255)
+
+local function FormatNumber(n)
+    local s = tostring(math.floor(n))
+    local k
+    repeat
+        s, k = s:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
+    until k == 0
+    return s
+end
 
 local function UpdateCounter()
-    if CounterLabel then
-        CounterLabel.Text = "ฟาร์มอีโมทไปแล้ว: " .. EmoteCount .. " อีโมท"
+    if CountLabel then
+        CountLabel.Text = FormatNumber(EmoteCount)
     end
 end
 
+local function New(Class, Props, Parent)
+    local Obj = Instance.new(Class)
+    for k, v in pairs(Props) do
+        Obj[k] = v
+    end
+    Obj.Parent = Parent
+    return Obj
+end
+
+local function Round(Obj, Radius)
+    New("UICorner", { CornerRadius = Radius }, Obj)
+end
+
+local function Stroke(Obj, Color, Thickness)
+    New("UIStroke", { Color = Color, Thickness = Thickness, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, Obj)
+end
+
+local function Text(Parent, Props)
+    local Base = {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        TextWrapped = false,
+    }
+    for k, v in pairs(Props) do
+        Base[k] = v
+    end
+    return New("TextLabel", Base, Parent)
+end
+
 if Config.ShowCounter then
-    local Gui = Instance.new("ScreenGui")
-    Gui.Name = "EmoteCounter"
-    Gui.ResetOnSpawn = false
-    Gui.IgnoreGuiInset = true
-    Gui.DisplayOrder = 999
+    local Gui = New("ScreenGui", {
+        Name = "PryvexStatus",
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        DisplayOrder = 999,
+    })
 
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 300, 0, 60)
-    Frame.Position = UDim2.new(0.5, -150, 0, 10)
-    Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    Frame.BackgroundTransparency = 0.2
-    Frame.BorderSizePixel = 0
-    Frame.Parent = Gui
+    local Card = New("Frame", {
+        Size = UDim2.new(0, 440, 0, 270),
+        Position = UDim2.new(0.5, -220, 0, 10),
+        BackgroundColor3 = Color3.fromRGB(8, 8, 10),
+        BorderSizePixel = 0,
+    }, Gui)
+    Round(Card, UDim.new(0, 16))
+    Stroke(Card, Color3.fromRGB(55, 55, 60), 1.5)
 
-    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
+    -- Header: logo + title
+    New("ImageLabel", {
+        Size = UDim2.new(0, 44, 0, 44),
+        Position = UDim2.new(0, 20, 0, 14),
+        BackgroundTransparency = 1,
+        Image = PRYVEX_ICON,
+        ScaleType = Enum.ScaleType.Fit,
+    }, Card)
 
-    CounterLabel = Instance.new("TextLabel")
-    CounterLabel.Size = UDim2.new(1, 0, 1, 0)
-    CounterLabel.BackgroundTransparency = 1
-    CounterLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CounterLabel.Font = Enum.Font.GothamBold
-    CounterLabel.TextScaled = true
-    CounterLabel.Parent = Frame
+    Text(Card, {
+        Size = UDim2.new(0, 220, 0, 44),
+        Position = UDim2.new(0, 72, 0, 14),
+        Text = "Pryvex Hub",
+        TextSize = 28,
+    })
+
+    -- Session time (top right)
+    TimeLabel = Text(Card, {
+        Size = UDim2.new(0, 110, 0, 24),
+        Position = UDim2.new(1, -130, 0, 14),
+        Text = "00:00:00",
+        TextSize = 20,
+        TextXAlignment = Enum.TextXAlignment.Right,
+    })
+
+    Text(Card, {
+        Size = UDim2.new(0, 110, 0, 16),
+        Position = UDim2.new(1, -130, 0, 38),
+        Text = "SESSION TIME",
+        TextSize = 11,
+        Font = Enum.Font.GothamMedium,
+        TextColor3 = Color3.fromRGB(150, 150, 155),
+        TextXAlignment = Enum.TextXAlignment.Right,
+    })
+
+    -- clock icon (drawn)
+    local Clock = New("Frame", {
+        Size = UDim2.new(0, 24, 0, 24),
+        Position = UDim2.new(1, -162, 0, 17),
+        BackgroundTransparency = 1,
+    }, Card)
+    Round(Clock, UDim.new(1, 0))
+    Stroke(Clock, Purple, 2)
+    New("Frame", { -- minute hand
+        Size = UDim2.new(0, 2, 0, 8),
+        Position = UDim2.new(0.5, -1, 0.5, -8),
+        BackgroundColor3 = Purple,
+        BorderSizePixel = 0,
+    }, Clock)
+    New("Frame", { -- hour hand
+        Size = UDim2.new(0, 6, 0, 2),
+        Position = UDim2.new(0.5, -1, 0.5, -1),
+        BackgroundColor3 = Purple,
+        BorderSizePixel = 0,
+    }, Clock)
+
+    -- Divider
+    New("Frame", {
+        Size = UDim2.new(1, -32, 0, 1),
+        Position = UDim2.new(0, 16, 0, 68),
+        BackgroundColor3 = Color3.fromRGB(45, 45, 50),
+        BorderSizePixel = 0,
+    }, Card)
+
+    -- Main panel
+    local Panel = New("Frame", {
+        Size = UDim2.new(1, -40, 0, 120),
+        Position = UDim2.new(0, 20, 0, 86),
+        BackgroundColor3 = Color3.fromRGB(14, 14, 16),
+        BorderSizePixel = 0,
+    }, Card)
+    Round(Panel, UDim.new(0, 14))
+    Stroke(Panel, Color3.fromRGB(50, 50, 55), 1.5)
+
+    New("ImageLabel", { -- masks icon
+        Size = UDim2.new(0, 84, 0, 84),
+        Position = UDim2.new(0, 12, 0, 10),
+        BackgroundTransparency = 1,
+        Image = EMOTE_ICON,
+        ScaleType = Enum.ScaleType.Fit,
+    }, Panel)
+
+    CountLabel = Text(Panel, {
+        Size = UDim2.new(1, -110, 0, 70),
+        Position = UDim2.new(0, 100, 0, 6),
+        Text = "0",
+        TextSize = 56,
+        TextXAlignment = Enum.TextXAlignment.Center,
+    })
+
+    Text(Panel, {
+        Size = UDim2.new(1, -110, 0, 24),
+        Position = UDim2.new(0, 100, 0, 76),
+        Text = "EMOTES",
+        TextSize = 20,
+        TextColor3 = Purple,
+        TextXAlignment = Enum.TextXAlignment.Center,
+    })
+
+    local Line = New("Frame", {
+        Size = UDim2.new(0, 190, 0, 2),
+        Position = UDim2.new(0, 147, 0, 104),
+        BackgroundColor3 = Purple,
+        BorderSizePixel = 0,
+    }, Panel)
+    New("UIGradient", {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.5, 0),
+            NumberSequenceKeypoint.new(1, 1),
+        }),
+    }, Line)
+
+    -- Footer: user (bottom right)
+    local User = New("Frame", {
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -20, 0, 226),
+        Size = UDim2.new(0, 0, 0, 28),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundTransparency = 1,
+    }, Card)
+    New("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        Padding = UDim.new(0, 8),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+    }, User)
+
+    local Avatar = New("Frame", {
+        Size = UDim2.new(0, 26, 0, 26),
+        BackgroundTransparency = 1,
+        LayoutOrder = 1,
+    }, User)
+    Round(Avatar, UDim.new(1, 0))
+    Stroke(Avatar, Purple, 2)
+    local Head = New("Frame", {
+        Size = UDim2.new(0, 8, 0, 8),
+        Position = UDim2.new(0.5, -4, 0, 5),
+        BackgroundTransparency = 1,
+    }, Avatar)
+    Round(Head, UDim.new(1, 0))
+    Stroke(Head, Purple, 1.5)
+    local Body = New("Frame", {
+        Size = UDim2.new(0, 12, 0, 5),
+        Position = UDim2.new(0.5, -6, 0, 15),
+        BackgroundTransparency = 1,
+    }, Avatar)
+    Round(Body, UDim.new(0.5, 0))
+    Stroke(Body, Purple, 1.5)
+
+    Text(User, {
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        Text = "@" .. Player.Name,
+        TextSize = 16,
+        Font = Enum.Font.GothamMedium,
+        LayoutOrder = 2,
+    })
 
     Gui.Parent = (gethui and gethui()) or Player:WaitForChild("PlayerGui")
-
     UpdateCounter()
+
+    -- session timer
+    task.spawn(function()
+        while true do
+            local t = math.floor(os.clock() - StartTime)
+            TimeLabel.Text = string.format("%02d:%02d:%02d", t // 3600, (t % 3600) // 60, t % 60)
+            task.wait(1)
+        end
+    end)
 end
 
 -- ===================== FARM =====================
