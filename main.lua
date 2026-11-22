@@ -3,6 +3,7 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 local RunService = game:GetService("RunService")
 local GuiService = game:GetService("GuiService")
+local UserInputService = game:GetService("UserInputService")
 
 local Player = Players.LocalPlayer
 
@@ -402,9 +403,11 @@ if Config.ShowCounter then
 
     local Card = New("Frame", {
         Size = UDim2.new(0, 440, 0, 270),
-        Position = UDim2.new(0.5, -220, 0, 10),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
         BackgroundColor3 = Color3.fromRGB(8, 8, 10),
         BorderSizePixel = 0,
+        Active = true,
     }, Gui)
     Round(Card, UDim.new(0, 16))
     Stroke(Card, Color3.fromRGB(55, 55, 60), 1.5)
@@ -568,6 +571,43 @@ if Config.ShowCounter then
         Font = Enum.Font.GothamMedium,
         LayoutOrder = 2,
     })
+
+    -- free drag (เมาส์ + ทัช)
+    do
+        local Dragging, DragStart, StartPos, DragInput
+
+        Card.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1
+                or Input.UserInputType == Enum.UserInputType.Touch then
+                Dragging = true
+                DragStart = Input.Position
+                StartPos = Card.Position
+
+                Input.Changed:Connect(function()
+                    if Input.UserInputState == Enum.UserInputState.End then
+                        Dragging = false
+                    end
+                end)
+            end
+        end)
+
+        Card.InputChanged:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseMovement
+                or Input.UserInputType == Enum.UserInputType.Touch then
+                DragInput = Input
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(Input)
+            if Dragging and Input == DragInput then
+                local Delta = Input.Position - DragStart
+                Card.Position = UDim2.new(
+                    StartPos.X.Scale, StartPos.X.Offset + Delta.X,
+                    StartPos.Y.Scale, StartPos.Y.Offset + Delta.Y
+                )
+            end
+        end)
+    end
 
     Gui.Parent = (gethui and gethui()) or Player:WaitForChild("PlayerGui")
     UpdateCounter()
